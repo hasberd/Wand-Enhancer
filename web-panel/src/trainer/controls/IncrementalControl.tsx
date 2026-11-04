@@ -1,6 +1,6 @@
 import { cn } from '@/shared/lib/ui';
 
-import { resolveOption } from '../model/values';
+import { isSameOptionValue, resolveOption } from '../model/values';
 import { ActionButton } from './ActionButton';
 import { StepButton, type ControlInternalProps } from './shared';
 
@@ -12,7 +12,7 @@ export const IncrementalControl = ({ cheat, value, disabled, onChange }: Control
     return <ActionButton cheat={cheat} disabled={disabled} value={value} onChange={onChange} />;
   }
 
-  const currentIndex = options.findIndex((option) => isSameOption(option.value, value));
+  const currentIndex = options.findIndex((option) => isSameOptionValue(option.value, value));
   const previous = currentIndex > 0 ? options[currentIndex - 1] : null;
   const next = currentIndex >= 0 && currentIndex < options.length - 1 ? options[currentIndex + 1] : null;
   const currentLabel = options[currentIndex]?.label ?? String(value ?? '--');
@@ -27,7 +27,3 @@ export const IncrementalControl = ({ cheat, value, disabled, onChange }: Control
     </div>
   );
 };
-
-function isSameOption(left: unknown, right: unknown): boolean {
-  return String(left) === String(right);
-}

@@ -32,6 +32,9 @@ This repository patches the Wand Electron app from a .NET Framework WPF desktop 
 - Do not commit extracted `.source/` or `.sources/` output. Recreate it only for reverse-engineering sessions.
 - `AsarSharp.AsarExtractor.ExtractAll` must skip unpacked entries when their source path equals the destination (in-place extraction is a self-copy that fails on locked files like `TrainerLib_x64.dll`) and silently skip unpacked entries whose source is missing on disk (e.g. `auxiliary/GameLauncher.exe` removed by an installer). Do not reintroduce hard failure on either case.
 - The `DevToolsOnF12` patch anchors on the Electron main-process `<app>.whenReady().then(` site and attaches a `before-input-event` hook to every `BrowserWindow.webContents`. Do not patch the renderer keydown listener — the minified `ACTION_OPEN_DEV_TOOLS` dispatch site is not stable across Wand releases.
+- Pinned games and pinned cheats share `usePersistentStringSet` (`web-panel/src/shared/use-persistent-string-set.ts`); do not reintroduce per-feature load/toggle/save hooks. The active game (`session` > running-trainer status > attached trainer) is resolved only by `selectActiveGameRef` in `remote-session/selectors.ts`.
+- `normalizeCheatValue` returns `INVALID_CHEAT_VALUE` for partial/non-numeric number input and clamps to `args.min`/`args.max`; `changeCheat` must not send invalid values (NaN serializes to `null`).
+- `RemoteSessionClient` ignores events from any socket that is no longer current (browsers fire `close` asynchronously after a reconnect).
 - Cheats can be pinned per game in the web panel via `pinned-storage.ts` (`localStorage` key `wand-remote.pinned-cheats.v1:<gameId>`). Pinned cheats render as a virtual `pinned` category at the top of the list; their normal category placement is preserved.
 - Custom quick presets are per trainer/game and stored by `preset-storage.ts` under `localStorage` key `wand-remote.presets.v1:<gameId-or-trainerId>`. Presets capture persistent cheat values only; do not include `button` one-shot cheats in saved presets.
 - All `localStorage` access in `web-panel/src/` MUST go through `web-panel/src/shared/storage.ts` (`loadJson` / `saveJson` / `loadStringSet` / `saveStringSet`). Do not reintroduce per-capability `try/catch` + `JSON.parse` duplication. Trainer/game storage IDs are derived through the shared `getTrainerStorageId(trainer)` helper; do not re-implement the `gameId → titleId → trainerId → 'global'` precedence inline.
@@ -42,6 +45,7 @@ This repository patches the Wand Electron app from a .NET Framework WPF desktop 
 
 ## Validation
 
+- Web panel requires Node 22+ (`@lingui/cli` uses `fs.globSync`). Tests: `cd web-panel && pnpm test`; shared fixtures and the in-memory `FakeWebSocket` live in `web-panel/src/testing/` (test-only, never import from production code). `src/testing/setup.ts` runs Testing Library `cleanup()` after each test because vitest globals are off.
 - Web panel build: `cd web-panel && pnpm run build` (runs type-check, Vite build, then `build:bridge` into `dist`).
 - Bridge/script syntax checks after build: `node --check web-panel/dist/bridge.cjs` and `node --check web-panel/dist/renderer-scripts/remote-popup-cleanup.js`.
 - Production dist should contain only static assets and should not contain `mock-instance`, `Mock Adventure`, `Simulation`, `Debug session`, `mock=1`, `demo-session`, `vite.svg`, `tailwind-merge`, `class-variance-authority`, or `clsx`.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import { type CheatSchema, type InstalledAppSummary } from '../../protocol/messages';
-import { normalizeCheatValue } from '../trainer/model/values';
+import { INVALID_CHEAT_VALUE, normalizeCheatValue } from '../trainer/model/values';
 import { RemoteSessionClient } from './remote-session.client';
 import { localizeTrainerMeta } from './remote-session.i18n';
 import {
@@ -11,7 +11,7 @@ import {
   type RemoteSessionState,
 } from './remote-session.reducer';
 import { protocolAction } from './remote-session.protocol';
-import { selectIsConnected, selectPendingTargets } from './selectors';
+import { selectActiveGameRef, selectIsConnected, selectPendingTargets } from './selectors';
 
 const RECONNECT_DELAY_MS = 2000;
 
@@ -21,6 +21,9 @@ export function useRemoteSession() {
   const clientRef = useRef<RemoteSessionClient | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const connectRef = useRef<() => void>(() => {});
+  // Bumped whenever trainer metadata becomes stale (new meta, trainer switch, disconnect)
+  // so a slow localization request cannot resurrect an outdated trainer.
+  const trainerMetaGenerationRef = useRef(0);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -64,8 +67,16 @@ export function useRemoteSession() {
         const action = protocolAction(message);
         if (!action) return;
         if (action.type === 'trainerMeta') {
-          void localizeTrainerMeta(action.payload).then((payload) => dispatch({ ...action, payload }));
+          const generation = ++trainerMetaGenerationRef.current;
+          void localizeTrainerMeta(action.payload).then((payload) => {
+            if (generation === trainerMetaGenerationRef.current) {
+              dispatch({ ...action, payload });
+            }
+          });
           return;
+        }
+        if (action.type === 'trainerChanged') {
+          trainerMetaGenerationRef.current += 1;
         }
         dispatch(action);
       },
@@ -84,6 +95,7 @@ export function useRemoteSession() {
     clearReconnect();
     clientRef.current?.disconnect();
     clientRef.current = null;
+    trainerMetaGenerationRef.current += 1;
     dispatch({ type: 'disconnected' });
   }, [clearReconnect]);
 
@@ -98,6 +110,11 @@ export function useRemoteSession() {
     }
 
     const value = normalizeCheatValue(cheat, nextValue);
+    if (value === INVALID_CHEAT_VALUE) {
+      // Partial input such as "" or "-" while typing: wait for a complete number.
+      return false;
+    }
+
     const requestId = clientRef.current?.setValue(
       current.trainerMeta.trainer.trainerId,
       cheat.target,
@@ -135,8 +152,7 @@ export function useRemoteSession() {
       dispatch({ type: 'error', message: 'The bridge socket is not connected.' });
       return;
     }
-    const gameId = current.gameStatus?.session.gameId ?? current.gameStatus?.trainer.gameId ?? undefined;
-    const titleId = current.gameStatus?.session.titleId ?? current.gameStatus?.trainer.titleId ?? undefined;
+    const { gameId, titleId } = selectActiveGameRef(current.gameStatus);
     if (!clientRef.current?.stopPlaying(gameId ?? undefined, titleId ?? undefined)) {
       dispatch({ type: 'error', message: 'Failed to send the stop command to the bridge.' });
     }
@@ -174,7 +190,6 @@ export function useRemoteSession() {
     state,
     connected,
     pendingTargets,
-    socketReady: connected,
     connect,
     disconnect,
     setWsUrl,

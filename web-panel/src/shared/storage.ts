@@ -76,3 +76,14 @@ export function saveStringSet(key: string | null, value: Record<string, true>): 
   const ids = Object.keys(value);
   saveJson(key, ids, () => ids.length === 0);
 }
+
+export function toggleStringSetEntry(value: Record<string, true>, entry: string): Record<string, true> {
+  const next = { ...value };
+  if (next[entry]) {
+    delete next[entry];
+  } else {
+    next[entry] = true;
+  }
+
+  return next;
+}

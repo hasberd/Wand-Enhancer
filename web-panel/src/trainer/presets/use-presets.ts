@@ -11,7 +11,7 @@ type PresetsParams = {
 };
 
 export function usePresets({ presetStorageKey, trainerMeta, values, onError }: PresetsParams) {
-  const [presets, setPresets] = useState<RemotePreset[]>([]);
+  const [presets, setPresets] = useState<RemotePreset[]>(() => loadPresets(presetStorageKey));
 
   useEffect(() => {
     setPresets(loadPresets(presetStorageKey));
@@ -30,21 +30,26 @@ export function usePresets({ presetStorageKey, trainerMeta, values, onError }: P
         return false;
       }
 
-      const next = [...presets, createPreset(name, captured)];
-      setPresets(next);
-      savePresets(presetStorageKey, next);
+      const preset = createPreset(name, captured);
+      setPresets((current) => {
+        const next = [...current, preset];
+        savePresets(presetStorageKey, next);
+        return next;
+      });
       return true;
     },
-    [onError, presets, presetStorageKey, trainerMeta, values],
+    [onError, presetStorageKey, trainerMeta, values],
   );
 
   const deletePreset = useCallback(
     (presetId: string) => {
-      const next = presets.filter((preset) => preset.id !== presetId);
-      setPresets(next);
-      savePresets(presetStorageKey, next);
+      setPresets((current) => {
+        const next = current.filter((preset) => preset.id !== presetId);
+        savePresets(presetStorageKey, next);
+        return next;
+      });
     },
-    [presets, presetStorageKey],
+    [presetStorageKey],
   );
 
   return { presets, addPreset, deletePreset };

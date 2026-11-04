@@ -107,7 +107,7 @@ export const App = () => {
             <LibraryDrawer
               games={library.games}
               query={library.query}
-              canLaunch={session.socketReady}
+              canLaunch={session.connected}
               onClose={shell.closeLibrary}
               onPin={library.togglePin}
               onPlay={library.playGame}
