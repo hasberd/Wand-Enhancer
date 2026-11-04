@@ -5,7 +5,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { cn } from '@/shared/lib/ui';
 
 import type { CheatOption } from '../../../protocol/messages';
-import { resolveOption } from '../model/values';
+import { isSameOptionValue, resolveOption } from '../model/values';
 import type { ControlInternalProps } from './shared';
 
 export const SelectionControl = ({ cheat, value, disabled, onChange }: ControlInternalProps) => {
@@ -15,7 +15,7 @@ export const SelectionControl = ({ cheat, value, disabled, onChange }: ControlIn
     return <span className="text-[12px] text-(--deck-fg-4)"><Trans>No options</Trans></span>;
   }
 
-  const selectedOption = findOption(options, String(value ?? options[0].value)) ?? options[0];
+  const selectedOption = findOption(options, value ?? options[0].value) ?? options[0];
   const handleToggle = () => {
     if (disabled) {
       return;
@@ -43,7 +43,7 @@ export const SelectionControl = ({ cheat, value, disabled, onChange }: ControlIn
       {open ? (
         <div className="overflow-hidden rounded-[10px] border border-white/10 bg-white/[0.055] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
           {options.map((option) => {
-            const active = isSameOption(selectedOption.value, option.value);
+            const active = isSameOptionValue(selectedOption.value, option.value);
             return (
               <button
                 key={`${cheat.uuid}-${optionKey(option)}`}
@@ -66,10 +66,6 @@ function optionKey(option: CheatOption): string {
   return String(option.value);
 }
 
-function findOption(options: CheatOption[], value: string): CheatOption | undefined {
-  return options.find((option) => String(option.value) === value);
-}
-
-function isSameOption(left: unknown, right: unknown): boolean {
-  return String(left) === String(right);
+function findOption(options: CheatOption[], value: unknown): CheatOption | undefined {
+  return options.find((option) => isSameOptionValue(option.value, value));
 }

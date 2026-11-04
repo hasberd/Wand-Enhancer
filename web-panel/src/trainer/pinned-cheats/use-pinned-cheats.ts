@@ -1,31 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
 import type { CheatSchema } from '../../../protocol/messages';
-import { loadPinnedTargets, savePinnedTargets } from './pinned-cheat-storage';
+import { usePersistentStringSet } from '../../shared/use-persistent-string-set';
 
 type PinnedTargetsParams = {
   pinnedStorageKey: string | null;
 };
 
 export function usePinnedCheats({ pinnedStorageKey }: PinnedTargetsParams) {
-  const [pinnedTargets, setPinnedTargets] = useState<Record<string, true>>({});
-
-  useEffect(() => {
-    setPinnedTargets(loadPinnedTargets(pinnedStorageKey));
-  }, [pinnedStorageKey]);
-
-  const toggle = useCallback(
-    (cheat: CheatSchema) => {
-      setPinnedTargets((current) => {
-        const next = { ...current };
-        if (next[cheat.target]) delete next[cheat.target];
-        else next[cheat.target] = true;
-        savePinnedTargets(pinnedStorageKey, next);
-        return next;
-      });
-    },
-    [pinnedStorageKey],
-  );
+  const { entries: pinnedTargets, toggle: toggleTarget } = usePersistentStringSet(pinnedStorageKey);
+  const toggle = useCallback((cheat: CheatSchema) => toggleTarget(cheat.target), [toggleTarget]);
 
   return { pinnedTargets, toggle };
 }

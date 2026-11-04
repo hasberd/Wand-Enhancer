@@ -21,7 +21,6 @@ let requestSequence = 0;
 
 export class RemoteSessionClient {
   private socket: WebSocket | null = null;
-  private intentionalDisconnect = false;
 
   constructor(
     private readonly url: string,
@@ -30,32 +29,36 @@ export class RemoteSessionClient {
 
   connect(pairingToken?: string): void {
     this.disconnect();
-    this.intentionalDisconnect = false;
     this.handlers.onConnecting();
 
     const socket = new WebSocket(this.url);
     this.socket = socket;
+    // Browsers deliver `close`/`error` asynchronously, so a socket replaced by a reconnect
+    // (or closed via `disconnect()`) can still fire events later. Only the current socket counts.
+    const isCurrent = () => this.socket === socket;
 
     socket.addEventListener('open', () => {
+      if (!isCurrent()) return;
       this.handlers.onTransportOpen();
       this.send(this.createHelloMessage(pairingToken));
     });
-    socket.addEventListener('message', (event) => this.handleMessage(event));
-    socket.addEventListener('close', () => {
-      if (this.socket === socket) {
-        this.socket = null;
-      }
-      if (!this.intentionalDisconnect) {
-        this.handlers.onClose();
-      }
+    socket.addEventListener('message', (event) => {
+      if (isCurrent()) this.handleMessage(event);
     });
-    socket.addEventListener('error', () => this.handlers.onError('WebSocket connection failed.'));
+    socket.addEventListener('close', () => {
+      if (!isCurrent()) return;
+      this.socket = null;
+      this.handlers.onClose();
+    });
+    socket.addEventListener('error', () => {
+      if (isCurrent()) this.handlers.onError('WebSocket connection failed.');
+    });
   }
 
   disconnect(): void {
-    this.intentionalDisconnect = true;
-    this.socket?.close();
+    const socket = this.socket;
     this.socket = null;
+    socket?.close();
   }
 
   isOpen(): boolean {

@@ -8,6 +8,7 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       restoreMocks: true,
+      setupFiles: ['./src/testing/setup.ts'],
       alias: {
         'react-dom/test-utils': 'preact/test-utils',
       },

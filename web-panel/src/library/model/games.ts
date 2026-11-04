@@ -1,5 +1,6 @@
 import { formatHumanLabel } from '@/shared/lib/ui';
 import type { GameStatusPayload, InstalledAppSummary, TrainerSummary } from '../../../protocol/messages';
+import { selectActiveGameRef, type ActiveGameRef } from '../../remote-session/selectors';
 
 export type LibraryGame = {
     id: string;
@@ -27,8 +28,7 @@ export function buildLibraryGames(
     trainer: TrainerSummary | null,
     pinnedGameIds: Record<string, true>,
 ): LibraryGame[] {
-    const activeGameId = status?.session.gameId ?? status?.trainer.gameId ?? trainer?.gameId ?? null;
-    const activeTitleId = status?.session.titleId ?? status?.trainer.titleId ?? trainer?.titleId ?? null;
+    const active = selectActiveGameRef(status, trainer);
 
     return apps.map((app) => {
         const id = getInstalledAppId(app);
@@ -43,7 +43,7 @@ export function buildLibraryGames(
             gameId: app.gameId ?? null,
             titleId: app.titleId ?? null,
             pinned: Boolean(pinnedGameIds[id]),
-            running: isActiveInstalledApp(app, activeGameId, activeTitleId),
+            running: isActiveInstalledApp(app, active),
         };
     }).sort(compareLibraryGames);
 }
@@ -131,14 +131,10 @@ function compareLibraryGames(left: LibraryGame, right: LibraryGame): number {
     return left.title.localeCompare(right.title);
 }
 
-function isActiveInstalledApp(app: InstalledAppSummary, activeGameId: string | null, activeTitleId: string | null): boolean {
-    if (activeGameId && app.gameId === activeGameId) {
+function isActiveInstalledApp(app: InstalledAppSummary, active: ActiveGameRef): boolean {
+    if (active.gameId && app.gameId === active.gameId) {
         return true;
     }
 
-    if (activeTitleId && app.titleId === activeTitleId) {
-        return true;
-    }
-
-    return false;
+    return Boolean(active.titleId && app.titleId === active.titleId);
 }
